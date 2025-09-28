@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modulo Tracciamento Swap Contante</title>
+    <!-- Carica Tailwind CSS per lo styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Stile di base e font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            padding: 20px;
+        }
+        /* Stile per i campi input focalizzati */
+        input:focus, select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+        /* Rende l'area di riepilogo a scorrimento se troppo lunga (visualizzazione a schermo) */
+        #summaryOutput {
+            white-space: pre-wrap;
+            min-height: 120px;
+            overflow-y: auto;
+            background-color: #eef4ff;
+            border-left: 4px solid #3b82f6;
+            transition: box-shadow 0.3s;
+        }
+
+        /* Il DIV stampabile è nascosto di default */
+        #printableSummary {
+            display: none; 
+            white-space: pre-wrap;
+            padding: 0;
+            margin: 0;
+        }
+        
+        /* NUOVA REGOLA: Nasconde la sezione firma a schermo */
+        .print-only-section {
+            display: none;
+        }
+
+        /* Regole CSS specifiche per la stampa */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .printable-area {
+                padding: 0;
+                box-shadow: none;
+            }
+            .printable-area table {
+                border-collapse: collapse;
+                width: 100%; /* Forza la larghezza completa */
+            }
+            /* Rimuove lo sfondo scuro della testata del container */
+            body {
+                background-color: white !important;
+                margin: 0;
+            }
+            /* Stampa anche i bordi della tabella */
+            #currencyTableBody tr td, #currencyTableBody tr th, tfoot td {
+                border: 1px solid #ccc !important;
+            }
+            /* Nasconde le righe della tabella con valore zero o vuoto SOLO in stampa */
+            .row-zero-print {
+                display: none !important;
+            }
+            
+            /* NASCONDE LA TEXTAREA PER LA STAMPA */
+            #summaryOutput {
+                display: none !important; 
+            }
+
+            /* MOSTRA IL DIV STAMPABILE CHE NON È LIMITATO */
+            #printableSummary {
+                display: block !important;
+                font-size: 10pt; /* Rende il testo leggermente più piccolo per la stampa */
+                color: black;
+                margin-top: 20px;
+            }
+            
+            /* Rende visibile la sezione firma solo in stampa */
+            .print-only-section {
+                display: block !important;
+            }
+            
+            /* Forziamo la stampa di tutti i dati del riepilogo */
+            .summary-container {
+                display: block !important;
+            }
+
+            /* Stili per le linee di firma in stampa */
+            .signature-line {
+                border-bottom: 1px solid black;
+                width: 70%; 
+                margin-top: 40px; 
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-start justify-center">
+
+    <div class="w-full max-w-4xl bg-white p-6 md:p-10 rounded-xl shadow-2xl mt-8 printable-area">
+        <h1 class="text-3xl font-extrabold text-blue-900 mb-6 border-b-2 pb-2 border-blue-100">
+            Modulo Tracciamento Swap Componenti con denaro
+        </h1>
+
+        <!-- Sezione 1: Dati Identificativi -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <label class="block">
+                <span class="text-sm font-medium text-gray-700">Concessionario</span>
+                <input type="text" id="dealerName" placeholder="nome conc. autorizzato" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 border">
+            </label>
+            
+            <label class="block">
+                <span class="text-sm font-medium text-gray-700">Nome e Cognome Tecnico</span>
+                <input type="text" id="technicianName" placeholder="Mario Rossi" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 border">
+            </label>
+
+            <label class="block">
+                <span class="text-sm font-medium text-gray-700">Seriale della Macchina di Origine (ID MACCHINA)</span>
+                <input type="text" id="machineSerial" placeholder="202xxxxxxxxxx" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 border">
+            </label>
+
+            <label class="block">
+                <span class="text-sm font-medium text-gray-700">Seriale del Riciclatore/Componente Sostituito (VECCHIO)</span>
+                <input type="text" id="oldComponentSerial" placeholder="xxxxxxxxxxxx" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 border">
+            </label>
+        </div>
+
+        <h2 class="text-xl font-bold text-blue-800 mb-4 border-b pb-1">
+            2. Quantità di Denaro Contenuto (N° Pezzi per Valuta)
+        </h2>
+
+        <!-- Sezione 2: Tabella Inserimento Denaro -->
+        <!-- Tabella Fissa con tutte le valute visibili -->
+        <div class="overflow-x-auto mb-6 rounded-lg shadow-inner border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-blue-800 text-white">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider rounded-tl-lg">Valuta (EUR)</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Quantità (N° Pezzi)</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider rounded-tr-lg" colspan="2">Totale per Taglio (€)</th>
+                    </tr>
+                </thead>
+                <tbody id="currencyTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- Le righe sono generate da JS e sono tutte fisse -->
+                </tbody>
+                <tfoot>
+                    <tr class="bg-blue-50">
+                        <td colspan="2" class="px-4 py-3 text-right text-lg font-extrabold text-blue-900">TOTALE COMPLESSIVO:</td>
+                        <td id="grandTotal" class="px-4 py-3 text-left text-lg font-extrabold text-blue-900" colspan="2">€ 0.00</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <h2 class="text-xl font-bold text-blue-800 mt-8 mb-4 border-b pb-1">
+            3. Riepilogo Dati per Report (Per Copia)
+        </h2>
+        
+        <!-- Sezione 3: Riepilogo e Copia -->
+        <div class="summary-container">
+             <!-- Questo elemento serve per la COPIA (visibile su schermo, nascosto in stampa) -->
+             <textarea id="summaryOutput" readonly class="w-full p-4 rounded-lg text-gray-800 text-sm focus:ring-blue-500 focus:border-blue-500 transition border-0 shadow-md"></textarea>
+             
+             <!-- Questo elemento serve per la STAMPA (nascosto su schermo, visibile in stampa) -->
+             <div id="printableSummary"></div>
+        </div>
+
+        <!-- Sezione 4: Conferma e Firma (Visibile solo in Stampa) -->
+        <!-- Aggiunto "print-only-section" per nasconderlo a schermo -->
+        <div class="mt-10 pt-4 border-t-2 border-gray-200 print-only-section"> 
+            <h2 class="text-xl font-bold text-blue-800 mb-4">
+                4. Conferma e Firma
+            </h2>
+            <p class="text-sm font-medium text-gray-700 mb-6">
+                **ATTENZIONE:** Il conteggio è preliminare. La merce verrà verificata e confermata da Cashmatic all'arrivo presso la sede.
+            </p>
+            <div class="flex flex-col md:flex-row justify-around gap-12 text-sm">
+                <!-- Firma Tecnico -->
+                <div class="flex flex-col items-center w-full md:w-1/2">
+                    <div class="signature-line"></div>
+                    <span class="mt-2 font-semibold text-gray-800">Firma Tecnico Cashmatic</span>
+                </div>
+                <!-- Firma Cliente -->
+                <div class="flex flex-col items-center w-full md:w-1/2">
+                    <div class="signature-line"></div>
+                    <span class="mt-2 font-semibold text-gray-800">Firma Responsabile del Cliente</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pulsanti Copia e Stampa (NON STAMPABILI) -->
+        <div class="flex flex-col md:flex-row gap-4 mt-8 no-print">
+            <!-- Pulsante per copiare -->
+            <button id="copySummary" class="flex-1 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 disabled:opacity-50">
+                Copia Riepilogo Negli Appunti
+            </button>
+            
+            <!-- Nuovo pulsante per Stampa -->
+            <button id="printForm" class="flex-1 px-6 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-150">
+                Stampa Modulo
+            </button>
+        </div>
+        
+        <p id="copyMessage" class="mt-2 text-sm text-green-700 font-medium hidden">Copiato!</p>
+
+    </div>
+
+    <script>
+        // Array delle denominazioni EUR supportate (da 0.02 a 500.00), in ordine crescente
+        const EUR_DENOMINATIONS = [
+            0.02, 0.05, 0.10, 0.20, 0.50, 1.00, 2.00, // Monete
+            5.00, 10.00, 20.00, 50.00, 100.00, 200.00, 500.00 // Banconote
+        ];
+
+        const tableBody = document.getElementById('currencyTableBody');
+        const grandTotalElement = document.getElementById('grandTotal');
+        const summaryOutput = document.getElementById('summaryOutput');
+        const printableSummary = document.getElementById('printableSummary'); // Nuovo elemento
+        const copyButton = document.getElementById('copySummary');
+        const printButton = document.getElementById('printForm');
+        const copyMessage = document.getElementById('copyMessage');
+        
+        // Funzione per formattare i numeri come valuta (€ 0.00)
+        const formatCurrency = (value) => {
+            return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
+        };
+
+        // Funzione per ricalcolare tutti i totali e aggiornare il riepilogo
+        const updateAllTotals = () => {
+            let totalValue = 0;
+            const rows = tableBody.querySelectorAll('tr');
+            const detailRows = []; // Per il riepilogo
+
+            rows.forEach(row => {
+                const denomValue = parseFloat(row.dataset.denomination) || 0;
+                const countInput = row.querySelector('.currency-count-input');
+                const rowTotalElement = row.querySelector('.row-total');
+
+                const count = parseInt(countInput ? countInput.value : 0) || 0;
+                
+                const rowTotal = denomValue * count;
+                totalValue += rowTotal;
+
+                if (rowTotalElement) {
+                    rowTotalElement.textContent = formatCurrency(rowTotal);
+                }
+
+                // LOGICA CHIAVE PER LA STAMPA: Controlla se nascondere la riga
+                if (count === 0 || isNaN(count)) {
+                    // Nasconde la riga solo per la stampa (non per la visualizzazione normale)
+                    row.classList.add('row-zero-print'); 
+                } else {
+                    row.classList.remove('row-zero-print');
+                    detailRows.push({
+                        value: denomValue,
+                        count: count,
+                        total: rowTotal
+                    });
+                }
+            });
+
+            grandTotalElement.textContent = formatCurrency(totalValue);
+            generateSummary(totalValue, detailRows);
+        };
+
+        // Funzione per generare il riepilogo testuale
+        const generateSummary = (finalTotal, detailRows) => {
+            const dealerName = document.getElementById('dealerName').value.trim();
+            const technicianName = document.getElementById('technicianName').value.trim();
+            const machineSerial = document.getElementById('machineSerial').value.trim();
+            const oldComponentSerial = document.getElementById('oldComponentSerial').value.trim();
+            
+            let summaryText = `--- MODULO SWAP CASHMATIC ---\n\n`;
+            summaryText += `Data Intervento: ${new Date().toLocaleDateString('it-IT')}\n`;
+            
+            // Dati Concessionario/Tecnico Separati
+            summaryText += `Concessionario: ${dealerName || '[DA INSERIRE]'}\n`;
+            summaryText += `Nome e Cognome Tecnico: ${technicianName || '[DA INSERIRE]'}\n\n`;
+            
+            summaryText += `ID Macchina di Origine: ${machineSerial || '[DA INSERIRE]'}\n`;
+            summaryText += `Seriale Riciclatore VECCHIO: ${oldComponentSerial || '[DA INSERIRE]'}\n`;
+            
+            summaryText += `\nDETTAGLIO CONTANTE RIMOSSO (N° pezzi per valuta):\n`;
+            summaryText += `---------------------------------\n`;
+
+            if (detailRows.length === 0) {
+                summaryText += `(Nessun contante registrato o valori a zero)\n`;
+            } else {
+                 // I dettagli sono già in ordine crescente grazie all'array di base
+                 detailRows.forEach(item => {
+                    // Formattazione per il riepilogo: "10 pz x € 5,00 = € 50,00"
+                    summaryText += `${item.count} pz x ${formatCurrency(item.value).replace(/\s/g, "")} = ${formatCurrency(item.total).replace(/\s/g, "")}\n`;
+                });
+            }
+
+            summaryText += `---------------------------------\n`;
+            summaryText += `TOTALE COMPLESSIVO CONTENUTO: ${formatCurrency(finalTotal)}`;
+            
+            // Aggiorna sia la textarea per la copia che il div per la stampa
+            summaryOutput.value = summaryText;
+            // Usiamo <pre> per mantenere la formattazione esatta dei salti di riga
+            printableSummary.innerHTML = `<pre>${summaryText}</pre>`;
+            
+            // Abilita il pulsante di copia solo se i campi principali sono compilati
+            const canSubmit = dealerName.length > 0 && technicianName.length > 0 && machineSerial.length > 0 && oldComponentSerial.length > 0;
+            copyButton.disabled = !canSubmit;
+        };
+
+        // Funzione per generare la tabella fissa delle valute
+        const buildFixedTable = () => {
+            EUR_DENOMINATIONS.forEach(denom => {
+                const newRow = tableBody.insertRow();
+                // Aggiungiamo 'row-zero-print' di default, verrà rimossa se l'utente inserisce un valore
+                newRow.className = 'hover:bg-gray-50 transition duration-150 row-zero-print';
+                newRow.dataset.denomination = denom.toFixed(2); // Salva il valore della valuta nell'attributo dati
+
+                // Cella 1: Valuta
+                const cellDenom = newRow.insertCell();
+                cellDenom.className = 'px-4 py-2 font-semibold text-blue-900';
+                cellDenom.textContent = formatCurrency(denom);
+                
+                // Cella 2: Quantità (Input)
+                const cellCount = newRow.insertCell();
+                cellCount.className = 'px-4 py-2';
+                const countInput = document.createElement('input');
+                countInput.type = 'number';
+                countInput.min = '0';
+                countInput.placeholder = '0';
+                countInput.className = 'currency-count-input w-full rounded-lg border-gray-300 shadow-sm p-2 border text-sm text-right';
+                countInput.addEventListener('input', updateAllTotals);
+                countInput.setAttribute('inputmode', 'numeric'); // Tastiera numerica su mobile
+                cellCount.appendChild(countInput);
+                
+                // Cella 3: Totale Riga
+                const cellTotal = newRow.insertCell();
+                cellTotal.className = 'px-4 py-2 font-extrabold text-gray-900 row-total';
+                // La colspan è 2 per mantenere la struttura coerente con le righe senza azioni
+                cellTotal.colSpan = 2; 
+                cellTotal.textContent = formatCurrency(0);
+            });
+            // Aggiornamento iniziale
+            updateAllTotals();
+        };
+
+        // Event listeners per i campi dati identificativi
+        document.getElementById('dealerName').addEventListener('input', updateAllTotals); // NUOVO CAMPO
+        document.getElementById('technicianName').addEventListener('input', updateAllTotals);
+        document.getElementById('machineSerial').addEventListener('input', updateAllTotals);
+        document.getElementById('oldComponentSerial').addEventListener('input', updateAllTotals);
+        
+        // Event listener per il bottone "Copia Riepilogo"
+        copyButton.addEventListener('click', () => {
+            summaryOutput.select();
+            document.execCommand('copy');
+            
+            copyMessage.classList.remove('hidden');
+            setTimeout(() => {
+                copyMessage.classList.add('hidden');
+            }, 2000);
+        });
+        
+        // Event listener per il bottone "Stampa Modulo"
+        printButton.addEventListener('click', () => {
+            window.print();
+        });
+
+        // Inizializza la tabella fissa all'avvio
+        window.onload = buildFixedTable;
+    </script>
+
+</body>
+</html>
